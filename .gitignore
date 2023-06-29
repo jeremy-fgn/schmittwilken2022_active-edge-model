@@ -1,4 +1,5 @@
 # Avoid pushing results / visualizations
-simulations/**/
+/simulations/**/
 **.png
 
+/data/
