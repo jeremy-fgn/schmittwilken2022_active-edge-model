@@ -9,17 +9,17 @@ Last update on 04.06.2022
 #         General         #
 ###########################
 # Path for saving results of experiment 1:
-results_path1 = 'results_case1/'
+results_path1 = "results_case1/"
 
 # Path for saving results of experiment 2:
-results_path2 = 'results_case2/'
+results_path2 = "results_case2/"
 
 # Path for loading Contour Image database in test case 2:
-data_path2 = '../databases/grigorescu2003_contour_image_database/images/'
+data_path2 = "../databases/grigorescu2003_contour_image_database/images/"
 
 # Spatial resolution for simulations (pixels per degree).
 # High spatial frequency filters might not be depicted well for too small ppds.
-ppd = 40.
+ppd = 40.0
 
 # Number of trials in experiments
 n_trials = 10
@@ -29,16 +29,16 @@ n_trials = 10
 #          Drift          #
 ###########################
 # Diffusion coefficient in deg**2/s (controls drift lengths)
-D = 20. / (60.**2.)
+D = 20.0 / (60.0**2.0)
 
 # Total simulated fixation time in s
-T = 0.2
+T = 2.0
 
 # Drift sampling frequency in Hz / Temporal resolution
-pps = 100.
+pps = 100.0
 
 # If we do not perform temporal filtering, we can decrease the temporal sampling frequency
-pps_low = 10.
+pps_low = 10.0
 
 
 ###########################
@@ -62,10 +62,10 @@ remove_b = 0.5
 #      White stimuli      #
 ###########################
 # Visual extent of stimulus in test case 1 (deg)
-visual_extent = [-8., 8., -8., 8.]  # in deg
+visual_extent = [-8.0, 8.0, -8.0, 8.0]  # in deg
 
 # Noise center frequencies in cpd (Parameters taken from Betz2015)
-noisefreqs = [0.58, 1., 1.73, 3., 5.2, 9.]
+noisefreqs = [0.58, 1.0, 1.73, 3.0, 5.2, 9.0]
 
 # Number of noise masks:
 n_masks = len(noisefreqs)
