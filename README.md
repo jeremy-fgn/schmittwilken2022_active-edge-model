@@ -1,13 +1,10 @@
 ## Recent contributions
----
 This project is based on a fork of the model by Schmittwilken, L. & Maertens, M. (2022).
 It has been extended to include a more integrative model of fixational eye movements based on Engbert et al. (2011).
 The code has also been revised to support GPU usage through Cupy.
 It led to the creation of a poster for an oral presentation in 2023. See 'POSTER - Active Vision Model for Edge Detection.pdf'
----
 
-## Original README
-
+## Original README Below
 This is the code used to produce the results and visualizations published in
 
 Schmittwilken, L. & Maertens, M. (2022). Fixational eye movements enable robust edge detection. Journal of Vision, 22(5). [doi:10.1167/jov.22.8.5](https://doi.org/10.1167/jov.22.8.5)
