@@ -4,6 +4,10 @@ They are also relevant for quantifying the edge quality of the model.
 
 Last update on 04.06.2022
 @author: lynnschmittwilken
+
+Added Nvidia GPU support
+Last update on 29.06.2023
+@author: jeremy-fgn
 """
 
 import numpy as np
@@ -12,6 +16,7 @@ import matplotlib
 import sys
 import cv2
 from scipy import signal
+import cupy as cp
 
 try:
     # Recommended package to speed-up simulations
@@ -24,6 +29,18 @@ except:
 ###############################
 #       Helper functions      #
 ###############################
+def check_gpu_support():
+    """
+    Check if CUDA is available.
+    """
+    try:
+        device_count = cp.cuda.runtime.getDeviceCount()
+        return device_count > 0
+    except cp.cuda.runtime.CUDARuntimeError as e:
+        # CUDA not available
+        return False
+
+
 def print_progress(count, total):
     """Helper function to print progress.
 
@@ -276,6 +293,44 @@ def create_tfilt(tf):
     return H
 
 
+def create_tfilt_gpu(tf):
+    """Function to create a temporal bandpass filter fitted to the temporal tuning
+    properties of macaque simple cells reported in Zheng et al. (2007)
+
+    Parameters
+    ----------
+    tf
+        1d array with temporal frequencies.
+
+    Returns
+    -------
+    H
+        1d temporal bandpass filter.
+
+    """
+    if not check_gpu_support():
+        raise RuntimeError("GPU support is not available.")
+
+    # To get a symmetrical filter around 0 Hz, we calculate the absolute tfs:
+    tf = cp.abs(tf)
+
+    # The equation does not allow tf=0 Hz, so we implement a small workaround and set it to 0
+    # manually afterwards
+    idx0 = cp.where(tf == 0.0)[0]
+    tf[tf == 0.0] = 1.0
+
+    # Parameters from fitting the equation to the data of adult macaque V1 cells of Zheng2007:
+    m1 = 1.0  # 69.3 to actually scale it to the data
+    m2 = 22.9
+    m3 = 8.1
+    m4 = 0.8
+    H = m1 * cp.exp(-((tf / m2) ** 2.0)) / (1.0 + (m3 / tf) ** m4)
+
+    if len(idx0):
+        H[idx0[0]] = 0.0
+    return H
+
+
 def bandpass_filter(fx, fy, fcenter, sigma):
     """Function to create a bandpass filter
 
@@ -346,7 +401,7 @@ def brownian(T: float, pps: float, D: float):
     return y
 
 
-def create_drift(T, pps, ppd, D):
+def create_brownian_drift(T, pps, ppd, D):
     """Function to create 2d drift motion.
 
     Parameters
@@ -384,6 +439,159 @@ def create_drift(T, pps, ppd, D):
     return y, y_int
 
 
+def create_integrative_drift_microsaccades(
+    T, pps, ppd, D, microsaccade_threshold=7.3, slope=1
+):
+    """Function to create 2D drift motion paths using Engbert's method.
+
+    From  Ralf Engbert (2021) Dynamical Models in Neurocognitive Psychology.
+    Springer International Publishing. DOI: 10.1007/978-3-030-67299-7
+
+    Parameters
+    ----------
+    T
+        Time interval (unit: s)
+    pps
+        Temporal sampling frequency (unit: Hz)
+    ppd
+        Spatial resolution (pixels per degree)
+    microsaccade_threshold
+        Threshold for triggering a microsaccade
+
+    Returns
+    -------
+    eye_movement_path
+    """
+    # Simulation parameters
+    num_time_steps = int(T * 1000)
+    transient_truncation_value = 10000
+
+    # Activation field parameters
+    gamma = 0.999
+
+    # Quadratic potential parameters
+    L = 51
+    center = np.round(L / 2)
+    drift_slope = slope * L
+    microsaccade_slope = 2.0 * drift_slope
+
+    # Movement parameters
+    dt = 1.0 / pps
+    scaling_factor = np.sqrt(2.0 * dt * D) * ppd
+
+    # Neighbor vectors
+    vec = np.array([[-1, 0], [1, 0], [0, -1], [0, 1]])
+
+    # Initialize matrices
+    rows, cols = np.indices((L, L))
+    quadratic_potential_u = drift_slope * (
+        ((rows - center) / center) ** 2 + ((cols - center) / center) ** 2
+    )
+    quadratic_potential_u = np.float32(quadratic_potential_u)
+    activation_field = np.random.rand(L, L).astype(np.float32)
+    activation_field_t_plus_one = activation_field.copy()
+    sum_of_activity_h_and_quadratic_potential_u = np.zeros((L, L)).astype(np.float32)
+
+    eye_movement_coordinates = np.array([[center], [center]], dtype=int)
+
+    i = 0
+    num_microsaccades = 0
+
+    for j in range(transient_truncation_value + num_time_steps):
+        current_fixation = eye_movement_coordinates[:, i]
+        # noise = np.random.rand(2) * NOISE_RANGE
+        noise = 0
+
+        if j == transient_truncation_value:
+            eye_movement_coordinates = current_fixation.reshape(2, -1)
+            i = 0
+            num_microsaccades = 0
+
+        fields = activation_field_t_plus_one + quadratic_potential_u
+
+        # If over threshold, then microsaccadic movement
+        if fields[current_fixation[0], current_fixation[1]] > microsaccade_threshold:
+            row_indices, col_indices = np.indices((L, L))
+            sum_of_activity_h_and_quadratic_potential_u = (
+                fields
+                + microsaccade_slope
+                * (
+                    ((row_indices - current_fixation[0]) / center) ** 2
+                    * ((col_indices - current_fixation[1]) / center) ** 2
+                )
+            )
+
+            min_index = np.unravel_index(
+                np.argmin(sum_of_activity_h_and_quadratic_potential_u),
+                sum_of_activity_h_and_quadratic_potential_u.shape,
+            )
+
+            min_index = np.array(min_index).reshape(2, -1)
+            eye_movement_coordinates = np.hstack([eye_movement_coordinates, min_index])
+
+            num_microsaccades += 1
+
+        # If not over threshold, then drift
+        else:
+            # Rule II: Relaxation
+            activation_field_t_plus_one = gamma * activation_field
+
+            # Rule I: Activation
+            activation_field_t_plus_one[
+                int(current_fixation[0]), int(current_fixation[1])
+            ] += 1
+
+            # Sum of activation field and quadratic potential
+            fields = activation_field_t_plus_one + quadratic_potential_u
+
+            # Compute the coordinates of the neighbors
+            current_head_neighbors = current_fixation + vec
+
+            # Get the values of the neighbors in the fields array
+            current_head_neighbors_values = fields[
+                tuple(current_head_neighbors.astype(int).T)
+            ]
+
+            # Find the index of the minimum value among the neighbors
+            min_index = current_head_neighbors[np.argmin(current_head_neighbors_values)]
+
+            min_index = np.array(min_index).reshape(2, -1)
+            eye_movement_coordinates = np.hstack([eye_movement_coordinates, min_index])
+
+            activation_field = activation_field_t_plus_one
+
+        i += 1
+
+    # print("Number of microsaccades: ", num_microsaccades)
+
+    def downsample_walk(sa_random_walk, T, frequency):
+        total_samples = T * 1000
+        target_samples = T * frequency + 1
+
+        resampling_ratio = total_samples / target_samples
+        downsampled_walk = np.zeros((2, int(target_samples)), dtype=np.float32)
+
+        for i in range(int(target_samples)):
+            index = int(round(i * resampling_ratio))
+            index = min(index, total_samples - 1)  # Prevent out-of-bounds index
+            downsampled_walk[:, i] = sa_random_walk[:, index]
+
+        return downsampled_walk
+
+    eye_movement_path = downsample_walk(eye_movement_coordinates, T, pps) - center
+    noise = np.random.normal(0, 0.7, eye_movement_path.shape).astype(np.float32)
+    eye_movement_path += noise
+
+    # Scale the path variations by the scaling_factor
+    eye_movement_path = eye_movement_path * scaling_factor
+
+    # Convert the path variations to integers by rounding and casting to int
+    eye_movement_path_int = np.round(eye_movement_path).astype(int)
+
+    # Return both the floating-point and integer versions of the path variations
+    return eye_movement_path, eye_movement_path_int
+
+
 def apply_drift(stimulus, drift, back_lum=0.5):
     """Create a video in which the stimulus gets shifted over time based on drift.
 
@@ -410,13 +618,14 @@ def apply_drift(stimulus, drift, back_lum=0.5):
     largest_disp = int(np.abs(drift).max())
     stimulus_extended = np.pad(
         stimulus, largest_disp, "constant", constant_values=(back_lum)
-    )
+    ).astype(np.float32)
     center_x2 = int(np.size(stimulus_extended, 0) / 2)
     center_y2 = int(np.size(stimulus_extended, 1) / 2)
 
     # Initialize drift video:
     stimulus_video = np.zeros(
-        [np.size(stimulus, 0), np.size(stimulus, 1), steps], np.float16
+        [np.size(stimulus, 0), np.size(stimulus, 1), steps],
+        dtype=stimulus_extended.dtype,
     )
     stimulus_video[:, :, 0] = stimulus
 
@@ -428,7 +637,61 @@ def apply_drift(stimulus, drift, back_lum=0.5):
             center_x2 - center_x1 + x : center_x2 + center_x1 + x,
             center_y2 - center_y1 + y : center_y2 + center_y1 + y,
         ]
-    return stimulus_video.astype(np.float32)
+    return stimulus_video
+
+
+def apply_drift_gpu(stimulus, drift, back_lum=0.5):
+    """Create a video in which the stimulus gets shifted over time based on drift.
+
+    Parameters
+    ----------
+    stimulus
+        2D array / image
+    drift
+        2D discretized drift array (unit: px)
+    back_lum
+        Intensity value that is used to extend the array
+
+    Returns
+    -------
+    stimulus_video
+        3D array (dimensions: x, y, t) in which the stimulus is shifted over time
+
+    """
+    if not check_gpu_support():
+        raise RuntimeError("GPU support is not available.")
+
+    steps = cp.size(drift, 1)
+    center_x1 = int(cp.size(stimulus, 0) / 2)
+    center_y1 = int(cp.size(stimulus, 1) / 2)
+
+    # Determine the largest displacement and increase stimulus size accordingly
+    largest_disp = int(cp.abs(drift).max())
+    stimulus_extended = cp.pad(
+        stimulus,
+        ((largest_disp, largest_disp), (largest_disp, largest_disp)),
+        mode="constant",
+        constant_values=back_lum,
+    )
+    center_x2 = int(cp.size(stimulus_extended, 0) / 2)
+    center_y2 = int(cp.size(stimulus_extended, 1) / 2)
+
+    # Initialize drift video:
+    stimulus_video = cp.empty(
+        [cp.size(stimulus, 0), cp.size(stimulus, 1), steps],
+        dtype=stimulus_extended.dtype,
+    )
+    stimulus_video[:, :, 0] = stimulus
+
+    for t in range(1, steps):
+        x, y = int(drift[0, t]), int(drift[1, t])
+
+        # Create drift video:
+        stimulus_video[:, :, t] = stimulus_extended[
+            center_x2 - center_x1 + x : center_x2 + center_x1 + x,
+            center_y2 - center_y1 + y : center_y2 + center_y1 + y,
+        ]
+    return stimulus_video
 
 
 # %%
@@ -887,53 +1150,44 @@ def quantify_edges(array, template):
         two dimensions less than the input array
 
     """
-    if len(array.shape) == 2:
-        array0 = array
-    elif len(array.shape) == 3:
-        array0 = array[:, :, 0]
-    else:
-        array0 = array[:, :, 0, 0]
-
+    array_shape = array.shape
     pfac = 10
     x = np.arange(-pfac, pfac + 1)
+
+    array0 = array[:, :, 0] if len(array_shape) > 2 else array
     array_pad = np.pad(array0, pfac)
     xcorr = signal.correlate2d(array_pad, np.squeeze(template), "valid")
     idx_max = np.where(xcorr == xcorr.max())
     yshift = x[idx_max[0][0]]
     xshift = x[idx_max[1][0]]
     ystart = pfac + yshift
-    yend = pfac + yshift + np.size(array, 0)
+    yend = pfac + yshift + array_shape[0]
     xstart = pfac + xshift
-    xend = pfac + xshift + np.size(array, 1)
+    xend = pfac + xshift + array_shape[1]
 
-    # Flatten template vector
     template_1d = template.flatten()
 
-    if len(array.shape) == 2:
+    if len(array_shape) == 2:
         array_pad = np.pad(array, pfac)
         array_shift = array_pad[ystart:yend, xstart:xend]
         array_1d = array_shift.flatten()
         corrs = np.corrcoef(template_1d, array_1d)[0, 1]
 
-    elif len(array.shape) == 3:
-        n_masks = np.size(array, -1)
-        corrs = np.zeros(n_masks)
-        for i in range(n_masks):
-            array_pad = np.pad(array[:, :, i], pfac)
-            array_shift = array_pad[ystart:yend, xstart:xend]
-            array_1d = array_shift.flatten()
-            corrs[i] = np.corrcoef(template_1d, array_1d)[0, 1]
-
     else:
-        n_masks = np.size(array, -1)
-        n_filters = np.size(array, -2)
-        corrs = np.zeros([n_filters, n_masks])
+        n_masks = array_shape[-1]
+        n_filters = array_shape[-2] if len(array_shape) > 3 else 1
+        corrs = np.zeros((n_filters, n_masks))
+
         for i in range(n_masks):
             for j in range(n_filters):
-                array_pad = np.pad(array[:, :, j, i], pfac)
+                array_slice = (
+                    array[:, :, j, i] if len(array_shape) > 3 else array[:, :, i]
+                )
+                array_pad = np.pad(array_slice, pfac)
                 array_shift = array_pad[ystart:yend, xstart:xend]
                 array_1d = array_shift.flatten()
                 corrs[j, i] = np.corrcoef(template_1d, array_1d)[0, 1]
+
     return corrs
 
 
@@ -967,33 +1221,31 @@ def run_active_model(stimuli, drift, sfilts, tfilt, rb, integrate="mean2", norm=
         List of model outputs.
 
     """
-    n_masks, n_filters = len(stimuli), len(sfilts)
+    n_filters = len(sfilts)
 
     # Initiate measures:
     nX = stimuli[0].shape[0]
-    output = np.zeros([nX, nX, n_filters, n_masks])
+    output = np.zeros([nX, nX, n_filters], dtype=np.float32)
 
-    # Perform simulations:
-    for k in range(n_masks):
-        # Apply drift to stimulus
-        stimulus_video = apply_drift(stimuli[k], drift, back_lum=stimuli[0].mean())
+    # Apply drift to stimulus
+    stimulus_video = apply_drift(stimuli, drift, back_lum=stimuli[0].mean())
 
-        # Calculate fft and fftshift:
-        gfft_3d = np.fft.fftshift(fft.fftn(stimulus_video))
+    # Calculate fft and fftshift:
+    gfft_3d = np.fft.fftshift(np.fft.fftn(stimulus_video)).astype(np.complex64)
 
-        for i in range(n_filters):
-            # Perform spatiotemporal filtering:
-            output_temp = gfft_3d * sfilts[i] * tfilt
-            output_temp = fft.ifftn(np.fft.ifftshift(output_temp))
+    for i in range(n_filters):
+        # Perform spatiotemporal filtering:
+        output_temp = gfft_3d * sfilts[i] * tfilt
+        output_temp = np.fft.ifftn(np.fft.ifftshift(output_temp))
 
-            if integrate == "var":
-                # Integrate over time using variance
-                output[:, :, i, k] = np.real(output_temp).var(2)
-            elif integrate == "mean2":
-                # Integrate over time using squared mean
-                output[:, :, i, k] = np.real(output_temp**2.0).mean(2)
-            else:
-                raise ValueError("integration needs to be mean2 or var")
+        if integrate == "var":
+            # Integrate over time using variance
+            output[:, :, i] = np.real(output_temp).var(2)
+        elif integrate == "mean2":
+            # Integrate over time using squared mean
+            output[:, :, i] = np.real(output_temp**2.0).mean(2)
+        else:
+            raise ValueError("integration needs to be mean2 or var")
 
     # Remove borders before normalization to avoid border effects
     output = remove_borders(output, rb)
@@ -1004,6 +1256,88 @@ def run_active_model(stimuli, drift, sfilts, tfilt, rb, integrate="mean2", norm=
 
     # Sum model responses over spatial scales:
     output = np.sum(output, 2)
+    return output
+
+
+def run_active_model_gpu(
+    stimuli,
+    drift,
+    back_lum,
+    sfilts,
+    tfilt,
+    rb,
+    integrate="mean2",
+    norm=True,
+    mempool=None,
+    cache=None,
+):
+    """Convenience function that runs our model(s) on the input stimuli.
+
+    Parameters
+    ----------
+    stimuli
+        List with input stimuli.
+    drift
+        2D discretized drift array (unit: px)
+    sfilts
+        List of spatial filters defined in frequency space. For no spatial filtering, use [1.]
+    tfilt
+        Temporal filter defined in frequency space. For no temporal filtering, use 1.
+    rb
+        Number of pixels removed from the image boundaries.
+    integrate
+        Integration method (options: mean2 or var).
+    norm
+        Bool. If True, use spatial scale specific normalization.
+
+    Returns
+    -------
+    output
+        List of model outputs.
+
+    """
+    n_filters = len(sfilts)
+
+    # Initiate measures:
+    nX = cp.size(stimuli, 0)
+    nb_drifts = cp.size(drift, 1)
+    output = cp.empty([nX, nX, n_filters], dtype=cp.float32)
+
+    # Apply drift to stimulus
+    stimulus_video = apply_drift_gpu(stimuli, drift, back_lum)
+
+    gfft_3d = cp.fft.fftshift(cp.fft.fftn(stimulus_video)).astype(cp.complex64)
+
+    stimulus_video = None
+    output_temp = cp.empty((nX, nX, nb_drifts), dtype=cp.complex64)
+
+    for i in range(n_filters):
+        # Perform spatiotemporal filtering:
+        output_temp = gfft_3d * sfilts[i] * tfilt
+        output_temp = cp.fft.ifftshift(output_temp)
+        output_temp = cp.fft.ifftn(output_temp)
+
+        if integrate == "var":
+            # Integrate over time using variance
+            output[:, :, i] = cp.real(output_temp).var(2)
+        elif integrate == "mean2":
+            # Integrate over time using squared mean
+            output[:, :, i] = cp.real(output_temp**2.0).mean(2)
+        else:
+            raise ValueError("integration needs to be mean2 or var")
+
+    output_temp = None
+    mempool.free_all_blocks()
+
+    # Remove borders before normalization to avoid border effects
+    output = remove_borders(output, rb)
+
+    if norm:
+        # Normalize by global mean at each spatial scale:
+        output = output / cp.expand_dims(output.mean(axis=(0, 1)), (0, 1))
+
+    # Sum model responses over spatial scales:
+    output = cp.sum(output, 2)
     return output
 
 
