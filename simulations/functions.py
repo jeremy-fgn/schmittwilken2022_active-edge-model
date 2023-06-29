@@ -61,7 +61,7 @@ def octave_intervals(num: int):
     x = np.logspace(1, num, num=num, base=2)
 
     # Normalize, so that maximum is 1
-    return x/x.max()
+    return x / x.max()
 
 
 def remove_borders(array, rb: int):
@@ -83,11 +83,11 @@ def remove_borders(array, rb: int):
     """
     array_shape = array.shape
     if len(array_shape) == 2:
-        array = array[rb:array_shape[0]-rb, rb:array_shape[1]-rb]
+        array = array[rb : array_shape[0] - rb, rb : array_shape[1] - rb]
     elif len(array_shape) == 3:
-        array = array[rb:array_shape[0]-rb, rb:array_shape[1]-rb, :]
+        array = array[rb : array_shape[0] - rb, rb : array_shape[1] - rb, :]
     else:
-        array = array[rb:array_shape[0]-rb, rb:array_shape[1]-rb, :, :]
+        array = array[rb : array_shape[0] - rb, rb : array_shape[1] - rb, :, :]
     return array
 
 
@@ -113,34 +113,50 @@ def thicken_edges(array, n: int):
     add = 50
 
     if len(ashape) == 2:
-        array_large = np.zeros([ashape[0]+add+n, ashape[1]+add+n])
+        array_large = np.zeros([ashape[0] + add + n, ashape[1] + add + n])
 
         # Increase width of the contours by shifting the image by n pixels in each direction
-        for i in range(int(n/2)):
-            array_large[add+i:ashape[0]+add+i, add+i:ashape[1]+add+i] += array
-            array_large[add-i:ashape[0]+add-i, add-i:ashape[1]+add-i] += array
-            array_large[add+i:ashape[0]+add+i, add:ashape[1]+add] += array
-            array_large[add-i:ashape[0]+add-i, add:ashape[1]+add] += array
-            array_large[add:ashape[0]+add, add+i:ashape[1]+add+i] += array
-            array_large[add:ashape[0]+add, add-i:ashape[1]+add-i] += array
+        for i in range(int(n / 2)):
+            array_large[
+                add + i : ashape[0] + add + i, add + i : ashape[1] + add + i
+            ] += array
+            array_large[
+                add - i : ashape[0] + add - i, add - i : ashape[1] + add - i
+            ] += array
+            array_large[add + i : ashape[0] + add + i, add : ashape[1] + add] += array
+            array_large[add - i : ashape[0] + add - i, add : ashape[1] + add] += array
+            array_large[add : ashape[0] + add, add + i : ashape[1] + add + i] += array
+            array_large[add : ashape[0] + add, add - i : ashape[1] + add - i] += array
 
-        array_large[array_large > 1.] = 1.
-        output = array_large[add:ashape[0]+add, add:ashape[1]+add]
+        array_large[array_large > 1.0] = 1.0
+        output = array_large[add : ashape[0] + add, add : ashape[1] + add]
 
     elif len(ashape) == 3:
-        array_large = np.zeros([ashape[0]+add+n, ashape[1]+add+n, ashape[2]])
+        array_large = np.zeros([ashape[0] + add + n, ashape[1] + add + n, ashape[2]])
 
         # Increase width of the contours by shifting the image by n pixels in each direction
-        for i in range(int(n/2)):
-            array_large[add+i:ashape[0]+add+i, add+i:ashape[1]+add+i, :] += array
-            array_large[add-i:ashape[0]+add-i, add-i:ashape[1]+add-i, :] += array
-            array_large[add+i:ashape[0]+add+i, add:ashape[1]+add, :] += array
-            array_large[add-i:ashape[0]+add-i, add:ashape[1]+add, :] += array
-            array_large[add:ashape[0]+add, add+i:ashape[1]+add+i, :] += array
-            array_large[add:ashape[0]+add, add-i:ashape[1]+add-i, :] += array
+        for i in range(int(n / 2)):
+            array_large[
+                add + i : ashape[0] + add + i, add + i : ashape[1] + add + i, :
+            ] += array
+            array_large[
+                add - i : ashape[0] + add - i, add - i : ashape[1] + add - i, :
+            ] += array
+            array_large[
+                add + i : ashape[0] + add + i, add : ashape[1] + add, :
+            ] += array
+            array_large[
+                add - i : ashape[0] + add - i, add : ashape[1] + add, :
+            ] += array
+            array_large[
+                add : ashape[0] + add, add + i : ashape[1] + add + i, :
+            ] += array
+            array_large[
+                add : ashape[0] + add, add - i : ashape[1] + add - i, :
+            ] += array
 
-        array_large[array_large > 1.] = 1.
-        output = array_large[add:ashape[0]+add, add:ashape[1]+add, :]
+        array_large[array_large > 1.0] = 1.0
+        output = array_large[add : ashape[0] + add, add : ashape[1] + add, :]
     return output
 
 
@@ -166,7 +182,7 @@ def gauss_fft(fx, fy, sigma: float):
         2D Gaussian filter in frequency domain.
 
     """
-    gauss = np.exp(-2. * np.pi**2. * sigma**2. * (fx**2. + fy**2.))
+    gauss = np.exp(-2.0 * np.pi**2.0 * sigma**2.0 * (fx**2.0 + fy**2.0))
     return gauss
 
 
@@ -218,7 +234,7 @@ def calculate_peak_freq(dog, fs):
 
     peak_freqs = np.zeros(n_filters)
     for i in range(n_filters):
-        filter_row = dog[i][int(nX/2), :]
+        filter_row = dog[i][int(nX / 2), :]
         max_index = np.where(filter_row == np.max(filter_row))
         max_index = max_index[0][0]
         peak_freqs[i] = np.abs(fs[max_index])
@@ -245,18 +261,18 @@ def create_tfilt(tf):
 
     # The equation does not allow tf=0 Hz, so we implement a small workaround and set it to 0
     # manually afterwards
-    idx0 = np.where(tf == 0.)[0]
-    tf[tf == 0.] = 1.
+    idx0 = np.where(tf == 0.0)[0]
+    tf[tf == 0.0] = 1.0
 
     # Parameters from fitting the equation to the data of adult macaque V1 cells of Zheng2007:
-    m1 = 1.   # 69.3 to actually scale it to the data
+    m1 = 1.0  # 69.3 to actually scale it to the data
     m2 = 22.9
     m3 = 8.1
     m4 = 0.8
-    H = m1 * np.exp(-(tf / m2) ** 2.) / (1. + (m3 / tf)**m4)
+    H = m1 * np.exp(-((tf / m2) ** 2.0)) / (1.0 + (m3 / tf) ** m4)
 
     if len(idx0):
-        H[idx0[0]] = 0.
+        H[idx0[0]] = 0.0
     return H
 
 
@@ -281,10 +297,14 @@ def bandpass_filter(fx, fy, fcenter, sigma):
 
     """
     # Calculate the distance of each 2d spatial frequency from requested center frequency
-    distance = np.abs(fcenter - np.sqrt(fx**2. + fy**2.))
+    distance = np.abs(fcenter - np.sqrt(fx**2.0 + fy**2.0))
 
     # Create bandpass filter:
-    bandpass = 1. / (np.sqrt(2.*np.pi) * sigma) * np.exp(-(distance**2.) / (2.*sigma**2.))
+    bandpass = (
+        1.0
+        / (np.sqrt(2.0 * np.pi) * sigma)
+        * np.exp(-(distance**2.0) / (2.0 * sigma**2.0))
+    )
     bandpass = bandpass / bandpass.max()
     return bandpass
 
@@ -312,17 +332,17 @@ def brownian(T: float, pps: float, D: float):
 
     """
 
-    n = int(T*pps)  # Number of drift movements
-    dt = 1. / pps   # Time step between two consequent steps (unit: seconds)
+    n = int(T * pps)  # Number of drift movements
+    dt = 1.0 / pps  # Time step between two consequent steps (unit: seconds)
 
     # Generate a 2d stochastic, normally-distributed time series:
-    y = np.random.normal(0, 1., [2, n])
+    y = np.random.normal(0, 1.0, [2, n])
 
     # The average displacement is proportional to dt and D
-    y = y * np.sqrt(2.*dt*D)
+    y = y * np.sqrt(2.0 * dt * D)
 
     # Set initial displacement to 0.
-    y = np.insert(y, 0, 0., axis=1)
+    y = np.insert(y, 0, 0.0, axis=1)
     return y
 
 
@@ -350,8 +370,8 @@ def create_drift(T, pps, ppd, D):
     """
 
     # Since our simulations are in px-space, we want to ensure that our drift paths != 0
-    cond = 0.
-    while (cond == 0.):
+    cond = 0.0
+    while cond == 0.0:
         # Generate 2d brownian displacement array
         y = brownian(T, pps, D) * ppd
 
@@ -388,12 +408,16 @@ def apply_drift(stimulus, drift, back_lum=0.5):
 
     # Determine the largest displacement and increase stimulus size accordingly
     largest_disp = int(np.abs(drift).max())
-    stimulus_extended = np.pad(stimulus, largest_disp, 'constant', constant_values=(back_lum))
+    stimulus_extended = np.pad(
+        stimulus, largest_disp, "constant", constant_values=(back_lum)
+    )
     center_x2 = int(np.size(stimulus_extended, 0) / 2)
     center_y2 = int(np.size(stimulus_extended, 1) / 2)
 
     # Initialize drift video:
-    stimulus_video = np.zeros([np.size(stimulus, 0), np.size(stimulus, 1), steps], np.float16)
+    stimulus_video = np.zeros(
+        [np.size(stimulus, 0), np.size(stimulus, 1), steps], np.float16
+    )
     stimulus_video[:, :, 0] = stimulus
 
     for t in range(1, steps):
@@ -401,8 +425,9 @@ def apply_drift(stimulus, drift, back_lum=0.5):
 
         # Create drift video:
         stimulus_video[:, :, t] = stimulus_extended[
-                center_x2-center_x1+x:center_x2+center_x1+x,
-                center_y2-center_y1+y:center_y2+center_y1+y]
+            center_x2 - center_x1 + x : center_x2 + center_x1 + x,
+            center_y2 - center_y1 + y : center_y2 + center_y1 + y,
+        ]
     return stimulus_video.astype(np.float32)
 
 
@@ -425,8 +450,8 @@ def randomize_sign(array):
 
     """
     sign = np.random.rand(*array.shape) - 0.5
-    sign[sign <= 0.] = -1.
-    sign[sign > 0.] = 1.
+    sign[sign <= 0.0] = -1.0
+    sign[sign > 0.0] = 1.0
     array = array * sign
     return array
 
@@ -447,14 +472,14 @@ def pseudo_white_noise_patch(shape, A):
         Pseudorandom white noise patch
 
     """
-    Re = np.random.rand(*shape) * A - A/2.
-    Im = np.sqrt((A/2.)**2 - Re**2)
+    Re = np.random.rand(*shape) * A - A / 2.0
+    Im = np.sqrt((A / 2.0) ** 2 - Re**2)
     Im = randomize_sign(Im)
-    output = Re+Im*1j
+    output = Re + Im * 1j
     return output
 
 
-def pseudo_white_noise(n, A=2.):
+def pseudo_white_noise(n, A=2.0):
     """Function to create pseudorandom white noise. Code translated and adapted
     from Matlab scripts provided by T. Peromaa
 
@@ -474,51 +499,51 @@ def pseudo_white_noise(n, A=2.):
 
     """
     # We divide the noise spectrum in four quadrants with pseudorandom white noise
-    quadrant1 = pseudo_white_noise_patch((int(n/2)-1, int(n/2)-1), A)
-    quadrant2 = pseudo_white_noise_patch((int(n/2)-1, int(n/2)-1), A)
+    quadrant1 = pseudo_white_noise_patch((int(n / 2) - 1, int(n / 2) - 1), A)
+    quadrant2 = pseudo_white_noise_patch((int(n / 2) - 1, int(n / 2) - 1), A)
     quadrant3 = quadrant2[::-1, ::-1].conj()
     quadrant4 = quadrant1[::-1, ::-1].conj()
 
     # We place the quadrants in the spectrum to eventuate that each frequency component has
     # an amplitude of A/2
     spectrum = np.zeros([n, n], dtype=complex)
-    spectrum[1:int(n/2), 1:int(n/2)] = quadrant1
-    spectrum[1:int(n/2), int(n/2)+1:n] = quadrant2
-    spectrum[int(n/2+1):n, 1:int(n/2)] = quadrant3
-    spectrum[int(n/2+1):n, int(n/2+1):n] = quadrant4
+    spectrum[1 : int(n / 2), 1 : int(n / 2)] = quadrant1
+    spectrum[1 : int(n / 2), int(n / 2) + 1 : n] = quadrant2
+    spectrum[int(n / 2 + 1) : n, 1 : int(n / 2)] = quadrant3
+    spectrum[int(n / 2 + 1) : n, int(n / 2 + 1) : n] = quadrant4
 
     # We need to fill the rows / columns that the quadrants do not cover
     # Fill first row:
     row = pseudo_white_noise_patch((1, n), A)
     apu = np.fliplr(row)
-    row[0, int(n/2+1):n] = apu[0, int(n/2):n-1].conj()
+    row[0, int(n / 2 + 1) : n] = apu[0, int(n / 2) : n - 1].conj()
     spectrum[0, :] = np.squeeze(row)
 
     # Fill central row:
     row = pseudo_white_noise_patch((1, n), A)
     apu = np.fliplr(row)
-    row[0, int(n/2+1):n] = apu[0, int(n/2):n-1].conj()
-    spectrum[int(n/2), :] = np.squeeze(row)
+    row[0, int(n / 2 + 1) : n] = apu[0, int(n / 2) : n - 1].conj()
+    spectrum[int(n / 2), :] = np.squeeze(row)
 
     # Fill first column:
     col = pseudo_white_noise_patch((n, 1), A)
     apu = np.flipud(col)
-    col[int(n/2+1):n, 0] = apu[int(n/2):n-1, 0].conj()
-    spectrum[:, int(n/2)] = np.squeeze(col)
+    col[int(n / 2 + 1) : n, 0] = apu[int(n / 2) : n - 1, 0].conj()
+    spectrum[:, int(n / 2)] = np.squeeze(col)
 
     # Fill central column:
     col = pseudo_white_noise_patch((n, 1), A)
     apu = np.flipud(col)
-    col[int(n/2+1):n, 0] = apu[int(n/2):n-1, 0].conj()
+    col[int(n / 2 + 1) : n, 0] = apu[int(n / 2) : n - 1, 0].conj()
     spectrum[:, 0] = np.squeeze(col)
 
     # Set amplitude at filled-corners to A/2:
-    spectrum[0, 0] = -A/2 + 0j
-    spectrum[0, int(n/2)] = -A/2 + 0j
-    spectrum[int(n/2), 0] = -A/2 + 0j
+    spectrum[0, 0] = -A / 2 + 0j
+    spectrum[0, int(n / 2)] = -A / 2 + 0j
+    spectrum[int(n / 2), 0] = -A / 2 + 0j
 
     # Set DC = 0:
-    spectrum[int(n/2), int(n/2)] = 0 + 0j
+    spectrum[int(n / 2), int(n / 2)] = 0 + 0j
     return spectrum
 
 
@@ -546,10 +571,10 @@ def create_noisemask(nX, noisefreq, ppd, rms_contrast=0.2, pseudo_noise=True):
 
     """
     # We calculate sigma either to eventuate a ratio bandwidth of 1 octave
-    sigma = noisefreq / (3.*np.sqrt(2.*np.log(2.)))
+    sigma = noisefreq / (3.0 * np.sqrt(2.0 * np.log(2.0)))
 
     # Prepare spatial frequency axes and create bandpass filter:
-    fs = np.fft.fftshift(np.fft.fftfreq(nX, d=1./ppd))
+    fs = np.fft.fftshift(np.fft.fftfreq(nX, d=1.0 / ppd))
     fx, fy = np.meshgrid(fs, fs)
     bp_filter = bandpass_filter(fx, fy, noisefreq, sigma)
 
@@ -558,7 +583,7 @@ def create_noisemask(nX, noisefreq, ppd, rms_contrast=0.2, pseudo_noise=True):
         white_noise_fft = pseudo_white_noise(nX)
     else:
         # Create white noise and fft
-        white_noise = np.random.rand(nX, nX) * 2. - 1.
+        white_noise = np.random.rand(nX, nX) * 2.0 - 1.0
         white_noise_fft = np.fft.fftshift(np.fft.fft2(white_noise))
 
     # Filter white noise with bandpass filter
@@ -590,34 +615,38 @@ def create_white_stimulus(white_freq: str, ppd):
         2D array with White stimulus.
 
     """
-    if white_freq == 'high':
+    if white_freq == "high":
         # High freq (0.8 cpd):
         bar_width = int(0.638 * ppd)
         n_bars = 12
-    elif white_freq == 'medium':
+    elif white_freq == "medium":
         # Medium freq (0.4 cpd):
         bar_width = int(1.276 * ppd)
         n_bars = 6
-    elif white_freq == 'low':
+    elif white_freq == "low":
         # Low freq (0.2 cpd):
         bar_width = int(2.552 * ppd)
         n_bars = 4
 
     # Intensity values for grating bars
     grating_vals = [0.95, 1.05]
-    target_val = 1.
+    target_val = 1.0
 
     # Calculate position for gray patch and choose values
-    target_pos = (n_bars / 2 * bar_width, (n_bars / 2 - .5) * bar_width)
+    target_pos = (n_bars / 2 * bar_width, (n_bars / 2 - 0.5) * bar_width)
 
     # Create square wave grating
     stimulus = np.ones((bar_width * n_bars, bar_width * n_bars)) * grating_vals[1]
-    index = [i + j for i in range(bar_width) for j in range(0, bar_width * n_bars, bar_width * 2)]
+    index = [
+        i + j
+        for i in range(bar_width)
+        for j in range(0, bar_width * n_bars, bar_width * 2)
+    ]
     stimulus[index, :] = grating_vals[0]
 
     # Place test square at selected position
     y, x = target_pos
-    stimulus[int(y):int(y+bar_width), int(x):int(x+bar_width)] = target_val
+    stimulus[int(y) : int(y + bar_width), int(x) : int(x + bar_width)] = target_val
     return stimulus
 
 
@@ -656,8 +685,10 @@ def create_stimuli_dict(white_freq, params):
     white_size = white_stimulus.shape[0]
 
     # Add gray background that covers the desired visual extent
-    back_size = visual_extent[1]*2.*ppd-white_size
-    white_stimulus = np.pad(white_stimulus, int(back_size/2.), 'constant', constant_values=(1.))
+    back_size = visual_extent[1] * 2.0 * ppd - white_size
+    white_stimulus = np.pad(
+        white_stimulus, int(back_size / 2.0), "constant", constant_values=(1.0)
+    )
     stimulus_size = white_stimulus.shape[0]
 
     # Initiate nested list for stimuli.
@@ -669,12 +700,16 @@ def create_stimuli_dict(white_freq, params):
 
         for j in range(n_masks):
             # Apply noise mask of given noisefreq
-            stimuli.append(white_stimulus + create_noisemask(stimulus_size, noisefreqs[j], ppd))
+            stimuli.append(
+                white_stimulus + create_noisemask(stimulus_size, noisefreqs[j], ppd)
+            )
 
-    stimuli_dict = {'stimuli': stimuli_2d,
-                    'stimulus_size': stimulus_size,
-                    'background_size': back_size,
-                    'white_freq': white_freq}
+    stimuli_dict = {
+        "stimuli": stimuli_2d,
+        "stimulus_size": stimulus_size,
+        "background_size": back_size,
+        "white_freq": white_freq,
+    }
     return stimuli_dict
 
 
@@ -694,46 +729,58 @@ def plots_exp1(results_dict, plot_path: str):
         Path to save the results plot.
 
     """
-    vextent = results_dict['visual_extent']
-    noisefreqs = results_dict['noisefreqs']
+    vextent = results_dict["visual_extent"]
+    noisefreqs = results_dict["noisefreqs"]
     n_masks = len(noisefreqs)
 
     # Plot stimuli from the last trial:
-    stimuli = results_dict['stimuli']
+    stimuli = results_dict["stimuli"]
 
     # Calculate average edge quality over trials
-    corrs_mean = np.mean(results_dict['corrs_trials'], 0)
-    corrs_std = np.std(results_dict['corrs_trials'], 0)
+    corrs_mean = np.mean(results_dict["corrs_trials"], 0)
+    corrs_std = np.std(results_dict["corrs_trials"], 0)
 
     fig = plt.figure(figsize=(24, 12))
     outer = matplotlib.gridspec.GridSpec(3, 1, wspace=0.4, hspace=0.4)
 
     # Plot input stimuli
-    inner = matplotlib.gridspec.GridSpecFromSubplotSpec(1, n_masks, subplot_spec=outer[0], wspace=0.1, hspace=0.1)
+    inner = matplotlib.gridspec.GridSpecFromSubplotSpec(
+        1, n_masks, subplot_spec=outer[0], wspace=0.1, hspace=0.1
+    )
     for i in range(n_masks):
         smin, smax = stimuli[i].min(), stimuli[i].max()
         ax = plt.Subplot(fig, inner[i])
-        ax.imshow(stimuli[i], cmap='gray', vmin=smin, vmax=smax, extent=vextent)
-        ax.set_title('Noise: ' + str(noisefreqs[i]) + ' cpd')
+        ax.imshow(stimuli[i], cmap="gray", vmin=smin, vmax=smax, extent=vextent)
+        ax.set_title("Noise: " + str(noisefreqs[i]) + " cpd")
         fig.add_subplot(ax)
 
     # Plot model output
-    inner = matplotlib.gridspec.GridSpecFromSubplotSpec(1, n_masks, subplot_spec=outer[1], wspace=0.1, hspace=0.1)
+    inner = matplotlib.gridspec.GridSpecFromSubplotSpec(
+        1, n_masks, subplot_spec=outer[1], wspace=0.1, hspace=0.1
+    )
     for i in range(n_masks):
         smin, smax = stimuli[i].min(), stimuli[i].max()
         ax = plt.Subplot(fig, inner[i])
-        ax.imshow(results_dict['model_outputs'][:, :, i], cmap='pink', extent=vextent)
+        ax.imshow(results_dict["model_outputs"][:, :, i], cmap="pink", extent=vextent)
         fig.add_subplot(ax)
 
     # Plot model performance
-    inner = matplotlib.gridspec.GridSpecFromSubplotSpec(1, 3, subplot_spec=outer[2], wspace=0.1, hspace=0.1)
+    inner = matplotlib.gridspec.GridSpecFromSubplotSpec(
+        1, 3, subplot_spec=outer[2], wspace=0.1, hspace=0.1
+    )
     ax = plt.Subplot(fig, inner[1])
-    ax.errorbar(noisefreqs, corrs_mean, yerr=corrs_std, marker='.', capsize=3)
-    ax.set_title('Edge detection performance')
-    ax.set(ylabel='Correlation with gt', xlabel='Noise center freq (cpd)', xscale='log',
-           xticks=(0.58, 1, 9), xticklabels=(0.58, 1, 9), ylim=(0., 1.))
+    ax.errorbar(noisefreqs, corrs_mean, yerr=corrs_std, marker=".", capsize=3)
+    ax.set_title("Edge detection performance")
+    ax.set(
+        ylabel="Correlation with gt",
+        xlabel="Noise center freq (cpd)",
+        xscale="log",
+        xticks=(0.58, 1, 9),
+        xticklabels=(0.58, 1, 9),
+        ylim=(0.0, 1.0),
+    )
     fig.add_subplot(ax)
-    plt.savefig(plot_path + '.png', dpi=100)
+    plt.savefig(plot_path + ".png", dpi=100)
     plt.close()
 
 
@@ -769,15 +816,15 @@ def create_white_gt(imsize, back_size, white_freq, ppd, thickness):
     mag_target = 0.025
 
     # Parameters from Betz et al (2015):
-    if white_freq == 'high':
+    if white_freq == "high":
         # High freq (0.8 cpd):
         bar_width = int(0.638 * ppd)
         n_bars = 12
-    elif white_freq == 'medium':
+    elif white_freq == "medium":
         # Medium freq (0.4 cpd):
         bar_width = int(1.276 * ppd)
         n_bars = 6
-    elif white_freq == 'low':
+    elif white_freq == "low":
         # Low freq (0.2 cpd):
         bar_width = int(2.552 * ppd)
         n_bars = 4
@@ -786,24 +833,34 @@ def create_white_gt(imsize, back_size, white_freq, ppd, thickness):
     gt = np.zeros([imsize, imsize])
 
     # Add horizontal grating edges:
-    idx = [i+j-t for i in range(half+bar_width, imsize-half, bar_width) for j in range(0, t*2)]
-    gt[idx, half-t:imsize-half+t] = mag_grating
+    idx = [
+        i + j - t
+        for i in range(half + bar_width, imsize - half, bar_width)
+        for j in range(0, t * 2)
+    ]
+    gt[idx, half - t : imsize - half + t] = mag_grating
 
     # Add outer contour edges of stimulus:
-    gt[half-t:imsize-half+t, half-t:half+t] = mag_target
-    gt[half-t:imsize-half+t, imsize-half-t:imsize-half+t] = mag_target
-    gt[half-t:half+t, half-t:imsize-half+t] = mag_target
-    gt[imsize-half-t:imsize-half+t, half-t:imsize-half+t] = mag_target
+    gt[half - t : imsize - half + t, half - t : half + t] = mag_target
+    gt[half - t : imsize - half + t, imsize - half - t : imsize - half + t] = mag_target
+    gt[half - t : half + t, half - t : imsize - half + t] = mag_target
+    gt[imsize - half - t : imsize - half + t, half - t : imsize - half + t] = mag_target
 
     # Calculate position for gray patch
     y = n_bars / 2 * bar_width + half
-    x = (n_bars / 2 - .5) * bar_width + half
+    x = (n_bars / 2 - 0.5) * bar_width + half
 
     # Add edge signals for target with chosen thickness:
-    gt[int(y-t):int(y+t+bar_width), int(x-t):int(x+t)] = mag_target
-    gt[int(y-t):int(y+t+bar_width), int(x-t+bar_width):int(x+t+bar_width)] = mag_target
-    gt[int(y-t):int(y+t), int(x-t):int(x+t+bar_width)] = mag_target
-    gt[int(y-t+bar_width):int(y+t+bar_width), int(x-t):int(x+t+bar_width)] = mag_target
+    gt[int(y - t) : int(y + t + bar_width), int(x - t) : int(x + t)] = mag_target
+    gt[
+        int(y - t) : int(y + t + bar_width),
+        int(x - t + bar_width) : int(x + t + bar_width),
+    ] = mag_target
+    gt[int(y - t) : int(y + t), int(x - t) : int(x + t + bar_width)] = mag_target
+    gt[
+        int(y - t + bar_width) : int(y + t + bar_width),
+        int(x - t) : int(x + t + bar_width),
+    ] = mag_target
 
     # Normalize between 0 and 1
     gt = np.abs(gt) / np.abs(gt).max()
@@ -838,9 +895,9 @@ def quantify_edges(array, template):
         array0 = array[:, :, 0, 0]
 
     pfac = 10
-    x = np.arange(-pfac, pfac+1)
+    x = np.arange(-pfac, pfac + 1)
     array_pad = np.pad(array0, pfac)
-    xcorr = signal.correlate2d(array_pad, np.squeeze(template), 'valid')
+    xcorr = signal.correlate2d(array_pad, np.squeeze(template), "valid")
     idx_max = np.where(xcorr == xcorr.max())
     yshift = x[idx_max[0][0]]
     xshift = x[idx_max[1][0]]
@@ -884,7 +941,7 @@ def quantify_edges(array, template):
 ###############################
 #     Run model / controls    #
 ###############################
-def run_active_model(stimuli, drift, sfilts, tfilt, rb, integrate='mean2', norm=True):
+def run_active_model(stimuli, drift, sfilts, tfilt, rb, integrate="mean2", norm=True):
     """Convenience function that runs our model(s) on the input stimuli.
 
     Parameters
@@ -929,14 +986,14 @@ def run_active_model(stimuli, drift, sfilts, tfilt, rb, integrate='mean2', norm=
             output_temp = gfft_3d * sfilts[i] * tfilt
             output_temp = fft.ifftn(np.fft.ifftshift(output_temp))
 
-            if integrate == 'var':
+            if integrate == "var":
                 # Integrate over time using variance
                 output[:, :, i, k] = np.real(output_temp).var(2)
-            elif integrate == 'mean2':
+            elif integrate == "mean2":
                 # Integrate over time using squared mean
-                output[:, :, i, k] = np.real(output_temp**2.).mean(2)
+                output[:, :, i, k] = np.real(output_temp**2.0).mean(2)
             else:
-                raise ValueError('integration needs to be mean2 or var')
+                raise ValueError("integration needs to be mean2 or var")
 
     # Remove borders before normalization to avoid border effects
     output = remove_borders(output, rb)
@@ -972,11 +1029,13 @@ def run_canny(stimuli, lthresh, htresh, gkernel=3):
 
     """
     n_masks = len(stimuli)
-    output = np.zeros(np.concatenate((stimuli[0].shape, np.array([n_masks])), axis=None))
+    output = np.zeros(
+        np.concatenate((stimuli[0].shape, np.array([n_masks])), axis=None)
+    )
 
     for i in range(n_masks):
         # Apply Gaussian blur and use Canny
-        stimulus = (stimuli[i] / stimuli[i].max() * 255.).astype(np.uint8)
+        stimulus = (stimuli[i] / stimuli[i].max() * 255.0).astype(np.uint8)
         stimulus = cv2.GaussianBlur(stimulus, (gkernel, gkernel), 0)
         output[:, :, i] = cv2.Canny(stimulus, lthresh, htresh)
     return output
